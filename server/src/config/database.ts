@@ -2,6 +2,7 @@ import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
+import bcrypt from 'bcryptjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -80,6 +81,7 @@ function ensureSchemaCompatibility(database: SqliteDatabase): void {
 
   ensureDefaultRoles(database);
   ensureCorePermissions(database);
+  ensureDefaultUserAndInstitution(database);
 
   try {
     if (hasTable(database, 'permissoes') && hasTable(database, 'role_permissoes')) {
@@ -116,6 +118,36 @@ function ensureDefaultRoles(database: SqliteDatabase): void {
 
   for (const role of defaultRoles) {
     insertRole.run(role.id, role.nome, role.descricao);
+  }
+}
+
+function ensureDefaultUserAndInstitution(database: SqliteDatabase): void {
+  if (!hasTable(database, 'instituicoes') || !hasTable(database, 'usuarios')) return;
+
+  // 1. Verificar se já existe alguma instituição
+  let inst = database.prepare("SELECT id FROM instituicoes LIMIT 1").get() as { id: number } | undefined;
+  if (!inst) {
+    const insertInst = database.prepare(`
+      INSERT INTO instituicoes (codigo, nome, sigla, admin_email, storage_limit_gb)
+      VALUES (?, ?, ?, ?, ?)
+    `);
+    const instResult = insertInst.run('MINPLAN', 'Ministério do Planeamento', 'MINPLAN', 'admin@minplan.gov.ao', 50);
+    inst = { id: Number(instResult.lastInsertRowid) };
+    console.log('--- [AUTO-REPARAÇÃO] Instituição padrão criada (MINPLAN) ---');
+  }
+
+  // 2. Verificar se já existe algum usuário
+  const user = database.prepare("SELECT id FROM usuarios LIMIT 1").get();
+  if (!user) {
+    const senhaHash = bcrypt.hashSync('admin123', 10);
+    const insertUser = database.prepare(`
+      INSERT INTO usuarios (instituicao_id, nome, email, senha_hash, cargo, role_id)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `);
+    
+    // Associar ao perfil Admin Institucional (role_id = 2)
+    insertUser.run(inst.id, 'Admin SIGAD', 'admin@minplan.gov.ao', senhaHash, 'Administrador de Sistemas', 2);
+    console.log('--- [AUTO-REPARAÇÃO] Usuário administrador padrão criado ---');
   }
 }
 
