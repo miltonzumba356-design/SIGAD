@@ -120,7 +120,6 @@ function ensureDefaultRoles(database: SqliteDatabase): void {
     insertRole.run(role.id, role.nome, role.descricao);
   }
 }
-
 function ensureDefaultUserAndInstitution(database: SqliteDatabase): void {
   if (!hasTable(database, 'instituicoes') || !hasTable(database, 'usuarios')) return;
 
@@ -131,23 +130,26 @@ function ensureDefaultUserAndInstitution(database: SqliteDatabase): void {
       INSERT INTO instituicoes (codigo, nome, sigla, admin_email, storage_limit_gb)
       VALUES (?, ?, ?, ?, ?)
     `);
-    const instResult = insertInst.run('MINPLAN', 'Ministério do Planeamento', 'MINPLAN', 'admin@minplan.gov.ao', 50);
+    const instResult = insertInst.run('MINPLAN', 'Ministério do Planeamento', 'MINPLAN', 'admin@sistema.com', 50);
     inst = { id: Number(instResult.lastInsertRowid) };
     console.log('--- [AUTO-REPARAÇÃO] Instituição padrão criada (MINPLAN) ---');
   }
 
-  // 2. Verificar se já existe algum usuário
-  const user = database.prepare("SELECT id FROM usuarios LIMIT 1").get();
+  // 2. Garantir o usuário administrador padrão com email admin@sistema.com e senha 12345
+  const user = database.prepare("SELECT id FROM usuarios WHERE email = 'admin@sistema.com'").get();
   if (!user) {
-    const senhaHash = bcrypt.hashSync('admin123', 10);
+    const senhaHash = bcrypt.hashSync('12345', 10);
     const insertUser = database.prepare(`
-      INSERT INTO usuarios (instituicao_id, nome, email, senha_hash, cargo, role_id)
-      VALUES (?, ?, ?, ?, ?, ?)
+      INSERT OR REPLACE INTO usuarios (id, instituicao_id, nome, email, senha_hash, cargo, role_id)
+      VALUES (1, ?, ?, ?, ?, ?, ?)
     `);
     
     // Associar ao perfil Admin Institucional (role_id = 2)
-    insertUser.run(inst.id, 'Admin SIGAD', 'admin@minplan.gov.ao', senhaHash, 'Administrador de Sistemas', 2);
-    console.log('--- [AUTO-REPARAÇÃO] Usuário administrador padrão criado ---');
+    insertUser.run(inst.id, 'Admin SIGAD', 'admin@sistema.com', senhaHash, 'Administrador de Sistemas', 2);
+    console.log('--- [AUTO-REPARAÇÃO] Usuário administrador admin@sistema.com criado/atualizado ---');
+    
+    // Remover o antigo admin padrão para limpar o banco de dados
+    database.prepare("DELETE FROM usuarios WHERE email = 'admin@minplan.gov.ao'").run();
   }
 }
 

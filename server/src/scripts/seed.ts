@@ -106,7 +106,7 @@ async function seed() {
       INSERT INTO instituicoes (codigo, nome, sigla, admin_email, storage_limit_gb)
       VALUES (?, ?, ?, ?, ?)
     `);
-    const instResult = insertInst.run('MINPLAN', 'Ministério do Planeamento', 'MINPLAN', 'admin@minplan.gov.ao', 50);
+    const instResult = insertInst.run('MINPLAN', 'Ministério do Planeamento', 'MINPLAN', 'admin@sistema.com', 50);
     const instId = instResult.lastInsertRowid;
 
     // 6. Criar Departamento de Teste
@@ -117,22 +117,22 @@ async function seed() {
 
     // 7. Criar Usuários de Teste
     console.log('-> Criando usuários de teste...');
-    const senhaHash = await bcrypt.hash('admin123', 10);
+    const senhaHash = await bcrypt.hash('12345', 10);
     const insertUser = db.prepare(`
       INSERT INTO usuarios (instituicao_id, departamento_id, nome, email, senha_hash, cargo, role_id)
       VALUES (?, ?, ?, ?, ?, ?, ?)
     `);
 
     // Admin
-    insertUser.run(instId, deptId, 'Admin SIGAD', 'admin@minplan.gov.ao', senhaHash, 'Administrador de Sistemas', adminInstRole.id);
+    insertUser.run(instId, deptId, 'Admin SIGAD', 'admin@sistema.com', senhaHash, 'Administrador de Sistemas', adminInstRole.id);
     
     // Arquivista
     insertUser.run(instId, deptId, 'Maria Arquivista', 'maria@minplan.gov.ao', senhaHash, 'Arquivista Sênior', arquivistaRole.id);
 
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     console.log('  ✓ Seed concluído com sucesso!');
-    console.log('  Email: admin@minplan.gov.ao');
-    console.log('  Senha: admin123');
+    console.log('  Email: admin@sistema.com');
+    console.log('  Senha: 12345');
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
   } catch (error: any) {
