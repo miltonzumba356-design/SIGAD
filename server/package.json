@@ -4,6 +4,9 @@
   "description": "Sistema Integrado de Gestao de Arquivos e Documentos",
   "main": "src/index.js",
   "type": "module",
+  "engines": {
+    "node": "20.x"
+  },
   "scripts": {
     "start": "tsx src/index.ts",
     "dev": "tsx watch src/index.ts",
@@ -25,6 +28,8 @@
     "pdf-parse": "^2.4.5",
     "sharp": "^0.34.5",
     "tesseract.js": "^4.1.4",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.3",
     "uuid": "^9.0.1"
   },
   "devDependencies": {
@@ -34,8 +39,6 @@
     "@types/jsonwebtoken": "^9.0.5",
     "@types/multer": "^1.4.11",
     "@types/node": "^20.11.5",
-    "nodemon": "^3.0.2",
-    "tsx": "^4.7.0",
-    "typescript": "^5.3.3"
+    "nodemon": "^3.0.2"
   }
 }
