@@ -78,6 +78,7 @@ function ensureSchemaCompatibility(database: SqliteDatabase): void {
     );
   `);
 
+  ensureDefaultRoles(database);
   ensureCorePermissions(database);
 
   try {
@@ -93,6 +94,28 @@ function ensureSchemaCompatibility(database: SqliteDatabase): void {
     }
   } catch (error) {
     console.error('Erro na auto-reparação de permissões:', error);
+  }
+}
+
+function ensureDefaultRoles(database: SqliteDatabase): void {
+  if (!hasTable(database, 'roles')) return;
+
+  const defaultRoles = [
+    { id: 1, nome: 'Super Admin', descricao: 'Administrador total do sistema' },
+    { id: 2, nome: 'Admin Institucional', descricao: 'Administrador da instituição' },
+    { id: 3, nome: 'Arquivista', descricao: 'Gestor de documentos e arquivo físico' },
+    { id: 4, nome: 'Digitalizador', descricao: 'Operador de digitalização e OCR' },
+    { id: 5, nome: 'Utilizador Padrão', descricao: 'Consulta e upload de documentos básicos' },
+    { id: 6, nome: 'Requisitante', descricao: 'Apenas consulta e solicitação de empréstimos' }
+  ];
+
+  const insertRole = database.prepare(`
+    INSERT OR IGNORE INTO roles (id, nome, descricao)
+    VALUES (?, ?, ?)
+  `);
+
+  for (const role of defaultRoles) {
+    insertRole.run(role.id, role.nome, role.descricao);
   }
 }
 
