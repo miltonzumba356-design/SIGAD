@@ -1,0 +1,41 @@
+services:
+  - name: sigad-backend
+    type: web
+    runtime: node
+    plan: free
+    rootDir: server
+    buildCommand: npm install
+    startCommand: npm run init-db && npm run seed && npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: NODE_ENV
+        value: production
+      - key: JWT_SECRET
+        generateValue: true
+      - key: DB_PATH
+        value: ./database/sigad.db
+      - key: UPLOAD_PATH
+        value: ./uploads
+      - key: TRUST_PROXY
+        value: "true"
+      - key: LOG_SQL
+        value: "false"
+      - key: FRONTEND_URL
+        value: https://sigad-frontend.onrender.com
+      - key: CORS_ALLOWED_ORIGINS
+        value: https://sigad-frontend.onrender.com
+
+  - name: sigad-frontend
+    type: web
+    runtime: static
+    rootDir: front
+    buildCommand: npm install && npm run build
+    staticPublishPath: ./dist
+    envVars:
+      - key: VITE_API_BASE_URL
+        value: https://sigad-backend.onrender.com/api/v1
+    routes:
+      - source: /*
+        destination: /index.html
