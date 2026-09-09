@@ -241,6 +241,20 @@ CREATE TABLE IF NOT EXISTS digitalizacoes_pendentes (
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Índice de pesquisa full-text/OCR (ver server/src/search/documentIndexer.ts)
+CREATE TABLE IF NOT EXISTS search_index (
+  doc_id TEXT PRIMARY KEY,
+  instituicao_id INTEGER,
+  doc_name TEXT NOT NULL,
+  doc_type TEXT NOT NULL,
+  text TEXT NOT NULL,
+  paragraphs_json TEXT NOT NULL,
+  word_map_json TEXT NOT NULL,
+  word_count INTEGER NOT NULL,
+  pages INTEGER NOT NULL,
+  indexed_at TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS auditoria (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   instituicao_id INTEGER NOT NULL,

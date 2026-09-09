@@ -32,6 +32,7 @@ interface LocationNode {
   tipo: 'EDIFICIO' | 'SALA' | 'ESTANTE' | 'PRATELEIRA' | 'CAIXA';
   parent_id?: number | null;
   documentos_count?: number;
+  capacidade_caixas?: number | null;
   children?: LocationNode[];
 }
 
@@ -61,6 +62,14 @@ const childType: Record<LocationNode['tipo'], LocationNode['tipo'] | ''> = {
   ESTANTE: 'PRATELEIRA',
   PRATELEIRA: 'CAIXA',
   CAIXA: ''
+};
+
+const typeLabelsPlural: Record<LocationNode['tipo'], string> = {
+  EDIFICIO: 'edifícios',
+  SALA: 'salas',
+  ESTANTE: 'estantes',
+  PRATELEIRA: 'prateleiras',
+  CAIXA: 'caixas'
 };
 
 function flattenLocations(nodes: LocationNode[]): LocationNode[] {
@@ -154,9 +163,19 @@ export function ArquivoFisico() {
     setExpandedNodes(prev => ({ ...prev, [nodeId]: !prev[nodeId] }));
   };
 
+  const selectedParent = formData.parent_id ? allLocations.find(loc => loc.id === Number(formData.parent_id)) : null;
+  const parentOcupacao = selectedParent?.children?.length || 0;
+  const parentCapacidade = selectedParent?.capacidade_caixas ?? null;
+  const parentNoLimite = parentCapacidade != null && parentOcupacao >= parentCapacidade;
+
   const handleCreateLocation = async () => {
     if (!formData.nome.trim()) {
       toast.error('Nome da localização é obrigatório');
+      return;
+    }
+
+    if (parentNoLimite) {
+      toast.error(`Capacidade máxima atingida (${parentOcupacao}/${parentCapacidade}) em "${selectedParent?.nome}".`);
       return;
     }
 
@@ -243,6 +262,10 @@ export function ArquivoFisico() {
   const renderTree = (nodes: LocationNode[]) => nodes.map(node => {
     const hasChildren = Boolean(node.children?.length);
     const expanded = expandedNodes[node.id] ?? true;
+    const ocupacao = node.children?.length || 0;
+    const capacidade = node.capacidade_caixas;
+    const atingiuLimite = capacidade != null && ocupacao >= capacidade;
+    const faltam = capacidade != null ? capacidade - ocupacao : null;
 
     return (
       <div key={node.id}>
@@ -252,6 +275,14 @@ export function ArquivoFisico() {
           </div>
           <LocationIcon tipo={node.tipo} />
           <span style={{ flex: 1 }}>{node.nome}</span>
+          {capacidade != null && (
+            <span
+              title={atingiuLimite ? 'Capacidade máxima atingida' : `Faltam ${faltam} ${typeLabelsPlural[childType[node.tipo] as LocationNode['tipo']] || 'itens'} para atingir a capacidade`}
+              style={{ color: atingiuLimite ? 'var(--red)' : 'var(--muted)', fontSize: '10px', fontWeight: 600, marginRight: 6 }}
+            >
+              {ocupacao}/{capacidade}
+            </span>
+          )}
           <span style={{ color: 'var(--muted)', fontSize: '10px' }}>{typeLabels[node.tipo]}</span>
         </div>
         {hasChildren && expanded && <div className="tree-children">{renderTree(node.children || [])}</div>}
@@ -303,10 +334,21 @@ export function ArquivoFisico() {
                 <label className="form-label">Dentro de</label>
                 <select className="form-input" value={formData.parent_id} onChange={e => setFormData({ ...formData, parent_id: e.target.value })}>
                   <option value="">Raiz da instituição</option>
-                  {allLocations.map(loc => (
-                    <option key={loc.id} value={loc.id}>{typeLabels[loc.tipo]} - {loc.nome}</option>
-                  ))}
+                  {allLocations.map(loc => {
+                    const ocupacao = loc.children?.length || 0;
+                    const cheio = loc.capacidade_caixas != null && ocupacao >= loc.capacidade_caixas;
+                    return (
+                      <option key={loc.id} value={loc.id}>
+                        {typeLabels[loc.tipo]} - {loc.nome}{loc.capacidade_caixas != null ? ` (${ocupacao}/${loc.capacidade_caixas}${cheio ? ' - cheio' : ''})` : ''}
+                      </option>
+                    );
+                  })}
                 </select>
+                {parentNoLimite && (
+                  <div style={{ color: 'var(--red)', fontSize: '11px', marginTop: 4 }}>
+                    "{selectedParent?.nome}" já atingiu a capacidade máxima ({parentOcupacao}/{parentCapacidade}).
+                  </div>
+                )}
               </div>
             </div>
             <div className="form-group">
@@ -319,12 +361,12 @@ export function ArquivoFisico() {
                 <input className="form-input" value={formData.codigo_barras} onChange={e => setFormData({ ...formData, codigo_barras: e.target.value })} placeholder="Opcional" />
               </div>
               <div className="form-group">
-                <label className="form-label">Capacidade</label>
-                <input type="number" className="form-input" value={formData.capacidade_caixas} onChange={e => setFormData({ ...formData, capacidade_caixas: e.target.value })} placeholder="Caixas" />
+                <label className="form-label">Capacidade máxima</label>
+                <input type="number" className="form-input" value={formData.capacidade_caixas} onChange={e => setFormData({ ...formData, capacidade_caixas: e.target.value })} placeholder="N.º máximo de itens dentro" />
               </div>
             </div>
             <div className="form-actions">
-              <button className="btn btn-primary" onClick={handleCreateLocation}><Save size={14} style={{ marginRight: '8px' }} /> Guardar Localização</button>
+              <button className="btn btn-primary" onClick={handleCreateLocation} disabled={parentNoLimite}><Save size={14} style={{ marginRight: '8px' }} /> Guardar Localização</button>
             </div>
           </div>
         </div>

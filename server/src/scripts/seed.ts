@@ -9,32 +9,40 @@ async function seed() {
 
     const db = getDatabase();
 
+    // Apaga o conteúdo de uma tabela apenas se ela já existir — evita que o seed
+    // rebente numa base de dados nova onde tabelas criadas "à medida da
+    // necessidade" (ex: search_index) ainda não foram inicializadas.
+    const safeDelete = (table: string) => {
+      const exists = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?").get(table);
+      if (exists) db.exec(`DELETE FROM ${table}`);
+    };
+
     // 1. Limpar dados existentes (cuidado em produção)
     db.exec('PRAGMA foreign_keys = OFF');
-    db.exec('DELETE FROM autorizacoes_download');
-    db.exec('DELETE FROM emprestimos');
-    db.exec('DELETE FROM search_index');
-    db.exec('DELETE FROM digitalizacoes_pendentes');
-    db.exec('DELETE FROM notificacoes');
-    db.exec('DELETE FROM relatorios');
-    db.exec('DELETE FROM auditoria');
-    db.exec('DELETE FROM documentos_localizacao');
-    db.exec('DELETE FROM fila_digitalizacao');
-    db.exec('DELETE FROM ficheiros');
-    db.exec('DELETE FROM documentos');
-    db.exec('DELETE FROM localizacoes_fisicas');
-    db.exec('DELETE FROM pastas');
-    db.exec('DELETE FROM role_permissoes');
-    db.exec('DELETE FROM permissoes');
-    db.exec('DELETE FROM sessoes');
-    db.exec('DELETE FROM usuarios');
-    db.exec('DELETE FROM roles');
-    db.exec('DELETE FROM departamentos');
-    db.exec('DELETE FROM instituicoes');
+    safeDelete('autorizacoes_download');
+    safeDelete('emprestimos');
+    safeDelete('search_index');
+    safeDelete('digitalizacoes_pendentes');
+    safeDelete('notificacoes');
+    safeDelete('relatorios');
+    safeDelete('auditoria');
+    safeDelete('documentos_localizacao');
+    safeDelete('fila_digitalizacao');
+    safeDelete('ficheiros');
+    safeDelete('documentos');
+    safeDelete('localizacoes_fisicas');
+    safeDelete('pastas');
+    safeDelete('role_permissoes');
+    safeDelete('permissoes');
+    safeDelete('sessoes');
+    safeDelete('usuarios');
+    safeDelete('roles');
+    safeDelete('departamentos');
+    safeDelete('instituicoes');
     // Reinicia todos os contadores AUTOINCREMENT: sem isto, IDs (ex: role_id de
     // "Super Admin") vão "andando" a cada reseed e quebram verificações de
     // admin espalhadas pelo sistema que assumem role_id 1/2 estáveis.
-    db.exec('DELETE FROM sqlite_sequence');
+    safeDelete('sqlite_sequence');
     db.exec('PRAGMA foreign_keys = ON');
 
     // 2. Criar Permissões

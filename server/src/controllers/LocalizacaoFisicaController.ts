@@ -62,7 +62,15 @@ export class LocalizacaoFisicaController {
         instituicao_id: instituicaoId
       });
       res.status(201).json({ data: { id, message: 'Localização criada com sucesso.' } });
-    } catch (error) {
+    } catch (error: any) {
+      if (error.message === 'CAPACITY_EXCEEDED') {
+        return res.status(409).json({
+          error: {
+            code: 'CAPACITY_EXCEEDED',
+            message: `Capacidade máxima atingida (${error.atual}/${error.max}). Aumente a capacidade da localização superior para adicionar mais itens.`
+          }
+        });
+      }
       res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: 'Erro ao criar localização.' } });
     }
   }
@@ -103,7 +111,15 @@ export class LocalizacaoFisicaController {
       } else {
         res.status(400).json({ error: { code: 'UPDATE_FAILED', message: 'Nenhuma alteração realizada.' } });
       }
-    } catch (error) {
+    } catch (error: any) {
+      if (error.message === 'CAPACITY_BELOW_CURRENT') {
+        return res.status(409).json({
+          error: {
+            code: 'CAPACITY_BELOW_CURRENT',
+            message: `Já existem ${error.atual} itens cadastrados; a capacidade não pode ser reduzida para ${error.max}.`
+          }
+        });
+      }
       res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: 'Erro ao atualizar localização.' } });
     }
   }

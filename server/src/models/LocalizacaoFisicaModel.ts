@@ -2,8 +2,31 @@ import { getDatabase } from '../config/database';
 import type { LocalizacaoFisica } from '../types';
 
 export class LocalizacaoFisicaModel {
+  /**
+   * Conta as sub-localizações ativas de um nó (filhos diretos).
+   */
+  static contarFilhos(parentId: number): number {
+    const db = getDatabase();
+    const row = db.prepare('SELECT COUNT(*) as count FROM localizacoes_fisicas WHERE parent_id = ? AND deleted_at IS NULL').get(parentId) as { count: number };
+    return row.count;
+  }
+
   static criar(dados: Omit<LocalizacaoFisica, 'id' | 'created_at' | 'updated_at'>): number {
     const db = getDatabase();
+
+    if (dados.parent_id) {
+      const parent = db.prepare('SELECT capacidade_caixas FROM localizacoes_fisicas WHERE id = ? AND deleted_at IS NULL').get(dados.parent_id) as { capacidade_caixas: number | null } | undefined;
+      if (parent?.capacidade_caixas != null) {
+        const atuais = this.contarFilhos(dados.parent_id);
+        if (atuais >= parent.capacidade_caixas) {
+          const error: any = new Error('CAPACITY_EXCEEDED');
+          error.atual = atuais;
+          error.max = parent.capacidade_caixas;
+          throw error;
+        }
+      }
+    }
+
     const stmt = db.prepare(`
       INSERT INTO localizacoes_fisicas (instituicao_id, parent_id, nome, tipo, codigo_barras, capacidade_caixas)
       VALUES (?, ?, ?, ?, ?, ?)
@@ -64,6 +87,17 @@ export class LocalizacaoFisicaModel {
 
   static atualizar(id: number, dados: Partial<LocalizacaoFisica>): boolean {
     const db = getDatabase();
+
+    if (dados.capacidade_caixas != null) {
+      const atuais = this.contarFilhos(id);
+      if (dados.capacidade_caixas < atuais) {
+        const error: any = new Error('CAPACITY_BELOW_CURRENT');
+        error.atual = atuais;
+        error.max = dados.capacidade_caixas;
+        throw error;
+      }
+    }
+
     const campos: string[] = [];
     const valores: any[] = [];
 
