@@ -25,6 +25,17 @@ import searchRoutes from './api/search.route';
 // Carrega variaveis de ambiente do arquivo .env
 dotenv.config();
 
+// Rede de segurança: bibliotecas como o tesseract.js correm workers internos
+// (worker_threads) cujos erros assíncronos (ex: falha de rede a obter dados de
+// idioma) não passam pelos try/catch normais e, sem isto, derrubam o processo
+// inteiro. Mantemos o servidor no ar e só registamos o erro.
+process.on('uncaughtException', (error) => {
+  console.error('❌ uncaughtException (servidor mantido no ar):', error);
+});
+process.on('unhandledRejection', (reason) => {
+  console.error('❌ unhandledRejection (servidor mantido no ar):', reason);
+});
+
 // Inicializa aplicacao Express
 const app = express();
 const PORT = process.env.PORT || 3000;

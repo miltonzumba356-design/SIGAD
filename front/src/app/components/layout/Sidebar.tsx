@@ -13,7 +13,8 @@ import {
   Building2,
   Settings,
   ChevronDown,
-  History
+  History,
+  ShieldQuestion
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -22,6 +23,7 @@ interface NavItemProps {
   label: string;
   icon: React.ReactNode;
   path: string;
+  adminOnly?: boolean;
 }
 
 const navItems: { section: string; items: NavItemProps[] }[] = [
@@ -49,6 +51,7 @@ const navItems: { section: string; items: NavItemProps[] }[] = [
       { id: 'instituicoes', label: 'Instituições', icon: <Building2 size={18} />, path: '/instituicoes' },
       { id: 'configuracoes', label: 'Configurações', icon: <Settings size={18} />, path: '/configuracoes' },
       { id: 'auditoria', label: 'Auditoria', icon: <History size={18} />, path: '/auditoria' },
+      { id: 'pedidos-download', label: 'Pedidos de Download', icon: <ShieldQuestion size={18} />, path: '/pedidos-download', adminOnly: true },
     ]
   }
 ];
@@ -72,6 +75,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const canSwitch = useMemo(() => {
     return user?.role_id === 1 || user?.role_id === 2 || user?.permissoes?.includes('sys.institutions');
   }, [user]);
+  const isAdmin = user?.role_id === 1 || user?.role_id === 2;
 
   const loadInstitutions = () => {
     api.request<Instituicao[]>('/institutions').then(res => {
@@ -170,7 +174,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
       {navItems.map((section) => (
         <div key={section.section}>
           <div className="nav-section">{section.section}</div>
-          {section.items.map((item) => {
+          {section.items.filter(item => !item.adminOnly || isAdmin).map((item) => {
             const isActive = location.pathname === item.path;
             return (
               <Link

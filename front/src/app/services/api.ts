@@ -128,6 +128,48 @@ class ApiService {
     }
   }
 
+  async download(endpoint: string, fallbackName: string): Promise<ApiResponse<void>> {
+    const url = `${API_BASE_URL}${endpoint}`;
+    const headers = new Headers();
+    if (this.accessToken) {
+      headers.set('Authorization', `Bearer ${this.accessToken}`);
+    }
+
+    try {
+      let response = await fetch(url, { headers });
+      if (response.status === 401 && this.refreshToken) {
+        const refreshed = await this.refreshTokens();
+        if (refreshed) {
+          headers.set('Authorization', `Bearer ${this.accessToken}`);
+          response = await fetch(url, { headers });
+        }
+      }
+
+      if (!response.ok) {
+        const body = await response.json().catch(() => null);
+        return { error: body?.error || { code: 'DOWNLOAD_ERROR', message: 'Erro ao descarregar ficheiro' } };
+      }
+
+      const disposition = response.headers.get('Content-Disposition') || '';
+      const match = disposition.match(/filename="?([^"]+)"?/);
+      const filename = match ? match[1] : fallbackName;
+
+      const blob = await response.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = objectUrl;
+      anchor.download = filename;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(objectUrl);
+
+      return { data: undefined };
+    } catch (error: any) {
+      return { error: { code: 'NETWORK_ERROR', message: error.message } };
+    }
+  }
+
   async refreshTokens(): Promise<boolean> {
     if (!this.refreshToken) return false;
 

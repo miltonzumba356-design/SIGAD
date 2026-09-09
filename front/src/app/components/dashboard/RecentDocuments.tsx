@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { FileText, ExternalLink } from 'lucide-react';
+import { FileText } from 'lucide-react';
 import { api } from '../../services/api';
+import { DownloadButton } from './DownloadButton';
 
 interface Document {
   id: number;
@@ -13,10 +14,16 @@ interface Document {
 
 export function RecentDocuments() {
   const [documents, setDocuments] = useState<Document[]>([]);
+  const [authorizedDownloads, setAuthorizedDownloads] = useState<Set<number>>(new Set());
+  const currentUser = api.getCurrentUser();
+  const isAdmin = currentUser?.role_id === 1 || currentUser?.role_id === 2;
 
   useEffect(() => {
     api.getDocumentos({ limit: 5 }).then(res => {
       if (res.data) setDocuments(res.data);
+    });
+    api.request<number[]>('/documents/authorized-downloads').then(res => {
+      if (res.data) setAuthorizedDownloads(new Set(res.data));
     });
   }, []);
 
@@ -57,9 +64,7 @@ export function RecentDocuments() {
                 <td className="px-6 py-4"><span className="text-sm text-muted-foreground">{doc.suporte || '-'}</span></td>
                 <td className="px-6 py-4"><span className="text-sm text-muted-foreground">{doc.classificacao || '-'}</span></td>
                 <td className="px-6 py-4">
-                  <button className="text-primary hover:text-primary/80 transition-colors">
-                    <ExternalLink className="w-4 h-4" />
-                  </button>
+                  <DownloadButton documentId={doc.id} titulo={doc.titulo} isAdmin={isAdmin} authorized={authorizedDownloads.has(doc.id)} />
                 </td>
               </tr>
             ))}

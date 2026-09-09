@@ -3,6 +3,7 @@ import { Layout } from '../components/layout/Layout';
 import { NewDocumentModal } from '../components/dashboard/NewDocumentModal';
 import { SecureDocumentViewer } from '../components/dashboard/SecureDocumentViewer';
 import { EditDocumentModal } from '../components/dashboard/EditDocumentModal';
+import { DownloadButton } from '../components/dashboard/DownloadButton';
 import { api } from '../services/api';
 import {
   Archive,
@@ -95,6 +96,15 @@ export function ArquivoFisico() {
   });
 
   const allLocations = useMemo(() => flattenLocations(tree), [tree]);
+  const [authorizedDownloads, setAuthorizedDownloads] = useState<Set<number>>(new Set());
+  const currentUser = api.getCurrentUser();
+  const isAdmin = currentUser?.role_id === 1 || currentUser?.role_id === 2;
+
+  useEffect(() => {
+    api.request<number[]>('/documents/authorized-downloads').then(res => {
+      if (res.data) setAuthorizedDownloads(new Set(res.data));
+    });
+  }, []);
 
   const loadTree = async () => {
     setLoading(true);
@@ -381,6 +391,7 @@ export function ArquivoFisico() {
                     <td>
                       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
                         <button className="btn btn-ghost btn-sm" title="Abrir versão digitalizada" onClick={() => openDocument(doc)}><Eye size={15} /></button>
+                        <DownloadButton documentId={doc.id} titulo={doc.titulo} isAdmin={isAdmin} authorized={authorizedDownloads.has(doc.id)} />
                         <button className="btn btn-ghost btn-sm" title="Editar nome / substituir ficheiro" onClick={() => editDocument(doc)}><Pencil size={15} /></button>
                         <button className="btn btn-ghost btn-sm" title="Digitalizar / carregar versão digital" onClick={() => digitizeDocument(doc)}><ScanText size={15} /></button>
                         <button className="btn btn-ghost btn-sm" title="Apagar" onClick={() => deleteDocument(doc)}><Trash2 size={15} /></button>

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Layout } from '../components/layout/Layout';
 import { api } from '../services/api';
-import { FileBarChart, Loader2, Plus } from 'lucide-react';
+import { FileBarChart, Loader2, Plus, Eye, Download } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface Relatorio {
@@ -18,17 +18,39 @@ export function Relatorios() {
   const [loading, setLoading] = useState(true);
   const [tipo, setTipo] = useState('RESUMO_DOCUMENTOS');
 
-  const loadData = async () => {
-    setLoading(true);
+  const loadData = async (silent = false) => {
+    if (!silent) setLoading(true);
     const res = await api.request<Relatorio[]>('/reports');
     if (res.data) setRelatorios(res.data);
-    else toast.error(res.error?.message || 'Erro ao carregar relatórios');
-    setLoading(false);
+    else if (!silent) toast.error(res.error?.message || 'Erro ao carregar relatórios');
+    if (!silent) setLoading(false);
   };
 
   useEffect(() => {
     loadData();
   }, []);
+
+  useEffect(() => {
+    const temPendentes = relatorios.some(relatorio => relatorio.estado === 'GERANDO');
+    if (!temPendentes) return;
+    const interval = setInterval(() => loadData(true), 3000);
+    return () => clearInterval(interval);
+  }, [relatorios]);
+
+  const verFicheiro = async (id: number) => {
+    const res = await api.blob(`/reports/${id}/file`);
+    if (res.data) {
+      const url = URL.createObjectURL(res.data);
+      window.open(url, '_blank');
+    } else {
+      toast.error(res.error?.message || 'Erro ao abrir relatório');
+    }
+  };
+
+  const baixarFicheiro = async (id: number, tipo: string) => {
+    const res = await api.download(`/reports/${id}/file?download=true`, `relatorio_${tipo}.pdf`);
+    if (res.error) toast.error(res.error.message || 'Erro ao descarregar relatório');
+  };
 
   const gerar = async () => {
     const res = await api.request('/reports', {
@@ -68,17 +90,31 @@ export function Relatorios() {
             <div className="section-title"><FileBarChart size={16} /> Relatórios Gerados</div>
             <div style={{ overflowX: 'auto' }}>
               <table>
-                <thead><tr><th>Tipo</th><th>Estado</th><th>Usuário</th><th>Data</th><th>Ficheiro</th></tr></thead>
+                <thead><tr><th>Tipo</th><th>Estado</th><th>Usuário</th><th>Data</th><th style={{ textAlign: 'right' }}>Ações</th></tr></thead>
                 <tbody>
                   {loading ? (
                     <tr><td colSpan={5} style={{ textAlign: 'center', padding: '40px' }}><Loader2 size={22} className="animate-spin" /></td></tr>
                   ) : relatorios.map(relatorio => (
                     <tr key={relatorio.id}>
                       <td>{relatorio.tipo}</td>
-                      <td><span className={`tag ${relatorio.estado === 'CONCLUIDO' ? 'tag-disponivel' : 'tag-publico'}`}>{relatorio.estado}</span></td>
+                      <td>
+                        <span className={`tag ${relatorio.estado === 'CONCLUIDO' ? 'tag-disponivel' : relatorio.estado === 'ERRO' ? 'tag-secreto' : 'tag-publico'}`}>
+                          {relatorio.estado === 'GERANDO' ? <Loader2 size={11} className="animate-spin" style={{ marginRight: 4, display: 'inline' }} /> : null}
+                          {relatorio.estado}
+                        </span>
+                      </td>
                       <td>{relatorio.usuario_nome || '-'}</td>
                       <td>{relatorio.created_at ? new Date(relatorio.created_at).toLocaleString() : '-'}</td>
-                      <td>{relatorio.caminho_ficheiro || '-'}</td>
+                      <td>
+                        {relatorio.estado === 'CONCLUIDO' ? (
+                          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                            <button className="btn btn-ghost btn-sm" title="Visualizar" onClick={() => verFicheiro(relatorio.id)}><Eye size={15} /></button>
+                            <button className="btn btn-ghost btn-sm" title="Baixar" onClick={() => baixarFicheiro(relatorio.id, relatorio.tipo)}><Download size={15} /></button>
+                          </div>
+                        ) : (
+                          <span style={{ color: 'var(--muted)', fontSize: 11 }}>-</span>
+                        )}
+                      </td>
                     </tr>
                   ))}
                   {!loading && relatorios.length === 0 && (

@@ -280,6 +280,22 @@ CREATE TABLE IF NOT EXISTS relatorios (
   FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
 );
 
+-- 11.1 Autorizações de download sem marca d'água
+CREATE TABLE IF NOT EXISTS autorizacoes_download (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  documento_id INTEGER NOT NULL,
+  usuario_id INTEGER NOT NULL,
+  estado VARCHAR(20) DEFAULT 'PENDENTE', -- PENDENTE, APROVADO, REJEITADO
+  motivo TEXT,
+  aprovado_por INTEGER,
+  notas_resposta TEXT,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (documento_id) REFERENCES documentos(id),
+  FOREIGN KEY (usuario_id) REFERENCES usuarios(id),
+  FOREIGN KEY (aprovado_por) REFERENCES usuarios(id)
+);
+
 -- 12. Índices para Performance e Segurança
 CREATE INDEX IF NOT EXISTS idx_instituicoes_codigo ON instituicoes(codigo);
 CREATE INDEX IF NOT EXISTS idx_usuarios_email ON usuarios(email);
@@ -287,6 +303,7 @@ CREATE INDEX IF NOT EXISTS idx_documentos_instituicao ON documentos(instituicao_
 CREATE INDEX IF NOT EXISTS idx_documentos_deleted ON documentos(deleted_at);
 CREATE INDEX IF NOT EXISTS idx_auditoria_instituicao ON auditoria(instituicao_id);
 CREATE INDEX IF NOT EXISTS idx_sessoes_token ON sessoes(refresh_token);
+CREATE INDEX IF NOT EXISTS idx_autorizacoes_download_documento ON autorizacoes_download(documento_id, usuario_id);
 `;
 
 try {

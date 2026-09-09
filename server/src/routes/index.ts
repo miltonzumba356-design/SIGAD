@@ -8,6 +8,7 @@ import documentosRoutes from './documentos';
 import emprestimosRoutes from './emprestimos';
 import digitalizacaoRoutes from './digitalizacao';
 import arquivoFisicoRoutes from './arquivoFisico';
+import downloadRequestsRoutes from './downloadRequests';
 import { AuditoriaController } from '../controllers/AuditoriaController';
 import { RelatorioController } from '../controllers/RelatorioController';
 import { TrashController } from '../controllers/TrashController';
@@ -49,6 +50,7 @@ v1.use('/documents', documentosRoutes);
 v1.use('/loans', emprestimosRoutes);
 v1.use('/digitization', digitalizacaoRoutes);
 v1.use('/physical-archive', arquivoFisicoRoutes);
+v1.use('/download-requests', downloadRequestsRoutes);
 v1.use('/', searchRoutes);
 
 // Roles (Perfis)
@@ -67,6 +69,7 @@ v1.get('/audit', verificarAutenticacao, isolamentoInstituicao, temQualquerPermis
 // Relatórios (Regra 12)
 v1.get('/reports', verificarAutenticacao, isolamentoInstituicao, temPermissao('rep.view'), RelatorioController.listar);
 v1.post('/reports', verificarAutenticacao, isolamentoInstituicao, temPermissao('rep.generate'), RelatorioController.gerar);
+v1.get('/reports/:id/file', verificarAutenticacao, isolamentoInstituicao, temPermissao('rep.view'), RelatorioController.ficheiro);
 
 // Reciclagem (Regra 16)
 v1.get('/trash', verificarAutenticacao, isolamentoInstituicao, temPermissao('sys.trash'), TrashController.listar);

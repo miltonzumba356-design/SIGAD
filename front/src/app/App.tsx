@@ -12,6 +12,7 @@ import { Utilizadores } from './pages/Utilizadores';
 import { Instituicoes } from './pages/Instituicoes';
 import { Configuracoes } from './pages/Configuracoes';
 import { Auditoria } from './pages/Auditoria';
+import { PedidosDownload } from './pages/PedidosDownload';
 import { Login } from './pages/Login';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -39,6 +40,7 @@ export default function App() {
           <Route path="/instituicoes" element={<ProtectedRoute><Instituicoes /></ProtectedRoute>} />
           <Route path="/configuracoes" element={<ProtectedRoute><Configuracoes /></ProtectedRoute>} />
           <Route path="/auditoria" element={<ProtectedRoute><Auditoria /></ProtectedRoute>} />
+          <Route path="/pedidos-download" element={<ProtectedRoute><PedidosDownload /></ProtectedRoute>} />
 
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

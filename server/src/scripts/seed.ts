@@ -11,6 +11,13 @@ async function seed() {
 
     // 1. Limpar dados existentes (cuidado em produção)
     db.exec('PRAGMA foreign_keys = OFF');
+    db.exec('DELETE FROM autorizacoes_download');
+    db.exec('DELETE FROM emprestimos');
+    db.exec('DELETE FROM search_index');
+    db.exec('DELETE FROM digitalizacoes_pendentes');
+    db.exec('DELETE FROM notificacoes');
+    db.exec('DELETE FROM relatorios');
+    db.exec('DELETE FROM auditoria');
     db.exec('DELETE FROM documentos_localizacao');
     db.exec('DELETE FROM fila_digitalizacao');
     db.exec('DELETE FROM ficheiros');
@@ -24,6 +31,10 @@ async function seed() {
     db.exec('DELETE FROM roles');
     db.exec('DELETE FROM departamentos');
     db.exec('DELETE FROM instituicoes');
+    // Reinicia todos os contadores AUTOINCREMENT: sem isto, IDs (ex: role_id de
+    // "Super Admin") vão "andando" a cada reseed e quebram verificações de
+    // admin espalhadas pelo sistema que assumem role_id 1/2 estáveis.
+    db.exec('DELETE FROM sqlite_sequence');
     db.exec('PRAGMA foreign_keys = ON');
 
     // 2. Criar Permissões

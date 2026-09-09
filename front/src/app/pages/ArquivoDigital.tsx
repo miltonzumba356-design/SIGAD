@@ -6,6 +6,7 @@ import { NewFolderModal } from '../components/dashboard/NewFolderModal';
 import { EditFolderModal } from '../components/dashboard/EditFolderModal';
 import { SecureDocumentViewer } from '../components/dashboard/SecureDocumentViewer';
 import { EditDocumentModal } from '../components/dashboard/EditDocumentModal';
+import { DownloadButton } from '../components/dashboard/DownloadButton';
 import { api } from '../services/api';
 import {
   Home,
@@ -36,6 +37,15 @@ export function ArquivoDigital() {
   const [editOpen, setEditOpen] = useState(false);
   const [editingFolder, setEditingFolder] = useState<any>(null);
   const [editFolderOpen, setEditFolderOpen] = useState(false);
+  const [authorizedDownloads, setAuthorizedDownloads] = useState<Set<number>>(new Set());
+  const currentUser = api.getCurrentUser();
+  const isAdmin = currentUser?.role_id === 1 || currentUser?.role_id === 2;
+
+  useEffect(() => {
+    api.request<number[]>('/documents/authorized-downloads').then(res => {
+      if (res.data) setAuthorizedDownloads(new Set(res.data));
+    });
+  }, []);
 
   const loadData = async (folderId: number | null = null) => {
     setLoading(true);
@@ -130,9 +140,16 @@ export function ArquivoDigital() {
   };
 
   const digitizeDocument = async (doc: any) => {
-    const res = await api.raw(`/documents/${doc.id}/index`, { method: 'POST' });
-    if (res.data) toast.success('Documento digitalizado/indexado com OCR');
-    else toast.error(res.error?.message || 'Erro ao digitalizar documento');
+    const res = await api.raw<{ wordCount?: number }>(`/documents/${doc.id}/index`, { method: 'POST' });
+    if (res.data) {
+      if (!res.data.wordCount) {
+        toast.warning('Documento indexado, mas nenhum texto foi reconhecido. Verifique a qualidade da digitalização.');
+      } else {
+        toast.success(`Documento indexado com sucesso (${res.data.wordCount} palavras reconhecidas)`);
+      }
+    } else {
+      toast.error(res.error?.message || 'Erro ao digitalizar documento');
+    }
   };
 
   return (
@@ -231,6 +248,7 @@ export function ArquivoDigital() {
                       <td>
                         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
                           <button className="btn btn-ghost btn-sm" title="Abrir / ler" onClick={() => openDocument(doc)}><Eye size={15} /></button>
+                          <DownloadButton documentId={doc.id} titulo={doc.titulo} isAdmin={isAdmin} authorized={authorizedDownloads.has(doc.id)} />
                           <button className="btn btn-ghost btn-sm" title="Editar / upload nova versão" onClick={() => editDocument(doc)}><Pencil size={15} /></button>
                           <button className="btn btn-ghost btn-sm" title="Digitalizar OCR" onClick={() => digitizeDocument(doc)}><ScanText size={15} /></button>
                           <button className="btn btn-ghost btn-sm" title="Apagar" onClick={() => deleteDocument(doc)}><Trash2 size={15} /></button>

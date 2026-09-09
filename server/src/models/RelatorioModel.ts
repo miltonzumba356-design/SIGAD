@@ -37,4 +37,9 @@ export class RelatorioModel {
       WHERE id = ?
     `).run(estado, caminhoFicheiro || erro || null, id);
   }
+
+  static buscarPorId(id: number): any | null {
+    const db = getDatabase();
+    return db.prepare('SELECT * FROM relatorios WHERE id = ?').get(id);
+  }
 }

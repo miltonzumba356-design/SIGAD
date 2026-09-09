@@ -11,13 +11,29 @@ let workerPromise: Promise<Worker> | null = null;
 async function getWorker(): Promise<Worker> {
   if (!workerPromise) {
     workerPromise = (async () => {
-      const worker = await createWorker({});
+      const worker = await createWorker({
+        cachePath: os.tmpdir(),
+        logger: (m: { status: string; progress: number }) => {
+          if (process.env.LOG_SQL === 'true') console.log('[OCR]', m.status, m.progress);
+        }
+      });
       await worker.loadLanguage('por+eng');
       await worker.initialize('por+eng');
       return worker;
-    })();
+    })().catch(error => {
+      // Permite que uma nova tentativa crie outro worker em vez de ficar preso numa promise rejeitada
+      workerPromise = null;
+      throw error;
+    });
   }
   return workerPromise;
+}
+
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) => setTimeout(() => reject(new Error(`${label}_TIMEOUT`)), ms))
+  ]);
 }
 
 function terminateWorker(): void {
@@ -44,11 +60,12 @@ export async function extractOcr(file: Buffer): Promise<ExtractionResult> {
   let tempPath: string | null = null;
   try {
     tempPath = await normalizeImageForOcr(file);
-    const worker = await getWorker();
-    const result = await worker.recognize(tempPath);
+    const worker = await withTimeout(getWorker(), 45000, 'OCR_WORKER_INIT');
+    const result = await withTimeout(worker.recognize(tempPath), 60000, 'OCR_RECOGNIZE');
     const text = result.data.text || '';
     return { text, wordCount: countWords(text), pages: 1 };
-  } catch {
+  } catch (error) {
+    console.error('[OCR] Falha ao processar imagem:', error instanceof Error ? error.message : error);
     return { text: '', wordCount: 0, pages: 0 };
   } finally {
     if (tempPath) {

@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { DocumentoController } from '../controllers/DocumentoController';
+import { AutorizacaoDownloadController } from '../controllers/AutorizacaoDownloadController';
 import { verificarAutenticacao, temPermissao, isolamentoInstituicao } from '../middleware/auth';
 import { upload } from '../middleware/upload';
 import { auditoriaMiddleware } from '../middleware/auditoria';
@@ -14,6 +15,12 @@ router.use(isolamentoInstituicao);
  * GET /documents/stats
  */
 router.get('/stats', temPermissao('docs.view'), DocumentoController.stats);
+
+/**
+ * GET /documents/authorized-downloads
+ * Lista os IDs de documentos que o utilizador autenticado pode descarregar sem marca d'água.
+ */
+router.get('/authorized-downloads', temPermissao('docs.view'), DocumentoController.autorizacoesDoUtilizador);
 
 /**
  * GET /documents
@@ -40,6 +47,19 @@ router.get('/:id/file', temPermissao('docs.view'), auditoriaMiddleware('VISUALIZ
  * Extrai texto para leitura protegida.
  */
 router.get('/:id/text', temPermissao('docs.view'), DocumentoController.texto);
+
+/**
+ * GET /documents/{id}/download?watermark=false
+ * Descarrega o ficheiro com o nome original. Marca d'água por defeito;
+ * apenas administradores ou utilizadores autorizados podem pedir sem marca d'água.
+ */
+router.get('/:id/download', temPermissao('docs.view'), auditoriaMiddleware('DESCARREGAR_DOCUMENTO', 'documento'), DocumentoController.download);
+
+/**
+ * POST /documents/{id}/download-request
+ * Solicita autorização para descarregar sem marca d'água.
+ */
+router.post('/:id/download-request', temPermissao('docs.view'), auditoriaMiddleware('SOLICITAR_DOWNLOAD_SEM_MARCA', 'documento'), AutorizacaoDownloadController.solicitar);
 
 /**
  * GET /documents/{id}

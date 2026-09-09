@@ -12,6 +12,9 @@ import { extractPdf } from '../search/extractors/pdfExtractor';
 import { extractText } from '../search/extractors/textExtractor';
 import { extractOcr } from '../search/extractors/ocrExtractor';
 import { normalizeText } from '../search/textNormalizer';
+import { applyWatermark } from '../services/watermarkService';
+import { AutorizacaoDownloadModel } from '../models/AutorizacaoDownloadModel';
+import { UsuarioModel } from '../models/UsuarioModel';
 
 export class DocumentoController {
   /**
@@ -251,6 +254,66 @@ export class DocumentoController {
       res.sendFile(filePath);
     } catch {
       res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: 'Erro ao abrir ficheiro.' } });
+    }
+  }
+
+  /**
+   * Descarrega o ficheiro mais recente, com marca d'água por defeito.
+   * Administradores podem pedir ?watermark=false; outros utilizadores só
+   * conseguem sem marca d'água se tiverem uma autorização aprovada para o documento.
+   */
+  static async download(req: AuthRequest, res: Response) {
+    try {
+      const id = Number(req.params.id);
+      const documento = DocumentoModel.buscarPorId(id);
+
+      if (!canAccessDocument(req, documento)) {
+        return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Documento não encontrado.' } });
+      }
+
+      const ficheiro = getLatestFile(id);
+      if (!ficheiro) {
+        return res.status(404).json({ error: { code: 'NO_FILE', message: 'Documento sem ficheiro digital.' } });
+      }
+
+      const filePath = resolveUploadPath(ficheiro.nome_interno);
+      if (!fs.existsSync(filePath)) {
+        return res.status(404).json({ error: { code: 'NO_FILE', message: 'Ficheiro não encontrado no armazenamento.' } });
+      }
+
+      const isAdmin = req.usuario!.role_id === 1 || req.usuario!.role_id === 2;
+      const wantsNoWatermark = req.query.watermark === 'false';
+      const autorizado = wantsNoWatermark && !isAdmin
+        ? AutorizacaoDownloadModel.temAutorizacaoAprovada(id, req.usuario!.id)
+        : false;
+      const semMarcaDagua = wantsNoWatermark && (isAdmin || autorizado);
+
+      let fileBuffer: Buffer = await fs.promises.readFile(filePath);
+      if (!semMarcaDagua) {
+        const requester = UsuarioModel.buscarPorId(req.usuario!.id);
+        const label = `SIGAD • ${requester?.nome || requester?.email || 'Utilizador'} • ${new Date().toLocaleDateString('pt-PT')}`;
+        fileBuffer = Buffer.from(await applyWatermark(fileBuffer, ficheiro.tipo_mime || '', path.extname(ficheiro.nome_original), label));
+      }
+
+      res.setHeader('Content-Type', ficheiro.tipo_mime || 'application/octet-stream');
+      res.setHeader('Content-Disposition', `attachment; filename="${sanitizeHeaderFilename(ficheiro.nome_original)}"`);
+      res.setHeader('Cache-Control', 'no-store');
+      res.end(fileBuffer);
+    } catch {
+      res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: 'Erro ao descarregar ficheiro.' } });
+    }
+  }
+
+  /**
+   * Indica se o utilizador autenticado tem autorização aprovada de download sem marca d'água,
+   * por documento (usado pelo front-end para mostrar a opção correta).
+   */
+  static autorizacoesDoUtilizador(req: AuthRequest, res: Response) {
+    try {
+      const documentoIds = AutorizacaoDownloadModel.listarDocumentosAutorizados(req.usuario!.id);
+      res.json({ data: documentoIds });
+    } catch {
+      res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: 'Erro ao obter autorizações de download.' } });
     }
   }
 
