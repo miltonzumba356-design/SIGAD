@@ -1,18 +1,73 @@
 import fs from 'fs';
 import path from 'path';
 import { Router } from 'express';
+import { getDatabase } from '../config/database';
 import { DocumentoModel } from '../models/DocumentoModel';
 import { FicheiroModel } from '../models/FicheiroModel';
 import { AuthRequest, verificarAutenticacao, temPermissao, isolamentoInstituicao } from '../middleware/auth';
 import { upload } from '../middleware/upload';
 import { getIndexedDocuments, indexDocument } from '../search/documentIndexer';
-import { searchDocuments } from '../search/searchEngine';
+import { searchDocuments, generateNameSnippet } from '../search/searchEngine';
+import { tokenize } from '../search/textNormalizer';
+import { SearchResult } from '../search/searchTypes';
 
 const router = Router();
 
 /**
+ * Finds documents whose title or stored file name matches the query terms,
+ * for documents that have not (yet) been content-indexed.
+ */
+function searchByTituloOuArquivo(instituicaoId: number | undefined, query: string, excludeIds: Set<string>): SearchResult[] {
+  const terms = tokenize(query);
+  const phrase = query.toLowerCase().trim();
+  if (terms.length === 0) return [];
+
+  const db = getDatabase();
+  const rows = db.prepare(`
+    SELECT d.id as id, d.titulo as titulo, f.nome_original as nome_arquivo
+    FROM documentos d
+    LEFT JOIN ficheiros f ON f.documento_id = d.id
+    WHERE d.instituicao_id = ? AND d.deleted_at IS NULL
+  `).all(instituicaoId) as Array<{ id: number; titulo: string; nome_arquivo: string | null }>;
+
+  const byDoc = new Map<number, { titulo: string; nomes: Set<string> }>();
+  for (const row of rows) {
+    if (!byDoc.has(row.id)) byDoc.set(row.id, { titulo: row.titulo, nomes: new Set() });
+    if (row.nome_arquivo) byDoc.get(row.id)!.nomes.add(row.nome_arquivo);
+  }
+
+  const results: SearchResult[] = [];
+  for (const [id, info] of byDoc) {
+    const docId = String(id);
+    if (excludeIds.has(docId)) continue;
+
+    let best: { text: string; matchCount: number } | null = null;
+    for (const candidate of [info.titulo, ...info.nomes].filter(Boolean)) {
+      const normalized = candidate.toLowerCase();
+      const matchCount = terms.reduce((sum, term) => normalized.includes(term) ? sum + 1 : sum, 0);
+      if (matchCount === 0) continue;
+      if (!best || matchCount > best.matchCount) best = { text: candidate, matchCount };
+    }
+    if (!best) continue;
+
+    const phraseBonus = phrase && best.text.toLowerCase().includes(phrase) ? 1 : 0;
+    results.push({
+      docId,
+      docName: info.titulo,
+      docType: 'digital',
+      score: Math.min(100, (best.matchCount + phraseBonus) * 20),
+      snippet: generateNameSnippet(best.text, terms),
+      matchCount: best.matchCount,
+      pages: 1
+    });
+  }
+
+  return results;
+}
+
+/**
  * POST /search
- * Searches indexed documents.
+ * Searches indexed documents, plus document titles and file names.
  */
 router.post('/search', verificarAutenticacao, temPermissao('docs.view'), (req: AuthRequest, res) => {
   const query = String(req.body?.query || '').trim();
@@ -26,7 +81,15 @@ router.post('/search', verificarAutenticacao, temPermissao('docs.view'), (req: A
     return res.status(400).json({ error: { code: 'VALIDATION_ERROR', message: 'Filtro inválido.' } });
   }
 
-  const results = searchDocuments(getIndexedDocuments(req.usuario!.instituicao_id), query, { filter });
+  const indexedResults = searchDocuments(getIndexedDocuments(req.usuario!.instituicao_id), query, { filter });
+
+  let results = indexedResults;
+  if (filter === 'all' || filter === 'digital') {
+    const excludeIds = new Set(indexedResults.map(item => item.docId));
+    const metadataResults = searchByTituloOuArquivo(req.usuario!.instituicao_id, query, excludeIds);
+    results = [...indexedResults, ...metadataResults].sort((a, b) => b.score - a.score);
+  }
+
   res.json(results);
 });
 

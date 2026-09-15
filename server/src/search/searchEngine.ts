@@ -36,7 +36,7 @@ function generateSnippet(text: string, terms: string[]): string {
   return snippet;
 }
 
-function generateNameSnippet(name: string, terms: string[]): string {
+export function generateNameSnippet(name: string, terms: string[]): string {
   let snippet = name;
   for (const term of terms) {
     snippet = snippet.replace(
