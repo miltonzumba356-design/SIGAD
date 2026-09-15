@@ -20,6 +20,7 @@ interface SearchResult {
 interface Documento {
   id: number;
   titulo: string;
+  tipo?: string;
 }
 
 interface IndexResponse {
@@ -49,6 +50,20 @@ export function PesquisaAvancada() {
   const [indexing, setIndexing] = useState(false);
   const [selectedDocument, setSelectedDocument] = useState<any>(null);
   const [viewerOpen, setViewerOpen] = useState(false);
+  const [allDocs, setAllDocs] = useState<Documento[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+
+  useEffect(() => {
+    api.getDocumentos({}).then(res => {
+      if (res.data) setAllDocs(res.data as Documento[]);
+    });
+  }, []);
+
+  const suggestions = query.trim()
+    ? allDocs
+        .filter(doc => doc.titulo?.toLowerCase().includes(query.trim().toLowerCase()))
+        .slice(0, 8)
+    : [];
 
   const pesquisar = async () => {
     if (!query.trim()) {
@@ -99,10 +114,18 @@ export function PesquisaAvancada() {
     if (query.trim()) pesquisar();
   };
 
-  const abrirResultado = async (result: SearchResult) => {
-    const res = await api.getDocumento(Number(result.docId));
-    setSelectedDocument(res.data || { id: Number(result.docId), titulo: result.docName });
+  const abrirDocumento = async (id: number, titulo: string) => {
+    const res = await api.getDocumento(id);
+    setSelectedDocument(res.data || { id, titulo });
     setViewerOpen(true);
+  };
+
+  const abrirResultado = (result: SearchResult) => abrirDocumento(Number(result.docId), result.docName);
+
+  const abrirSugestao = (doc: Documento) => {
+    setShowSuggestions(false);
+    setQuery(doc.titulo);
+    abrirDocumento(doc.id, doc.titulo);
   };
 
   const renderSnippet = (snippet: string) => {
@@ -127,13 +150,29 @@ export function PesquisaAvancada() {
               <Search size={16} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--muted)' }} />
               <input
                 value={query}
-                onChange={event => setQuery(event.target.value)}
-                onKeyDown={event => { if (event.key === 'Enter') pesquisar(); }}
+                onChange={event => { setQuery(event.target.value); setShowSuggestions(true); }}
+                onFocus={() => setShowSuggestions(true)}
+                onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+                onKeyDown={event => { if (event.key === 'Enter') { setShowSuggestions(false); pesquisar(); } }}
                 type="text"
                 className="form-input"
                 placeholder="Pesquisar em PDFs, imagens digitalizadas, DOCX e TXT"
                 style={{ fontSize: 14, padding: '12px 12px 12px 38px' }}
               />
+              {showSuggestions && suggestions.length > 0 && (
+                <div className="search-suggestions">
+                  {suggestions.map(doc => (
+                    <div
+                      key={doc.id}
+                      className="search-suggestion-item"
+                      onMouseDown={() => abrirSugestao(doc)}
+                    >
+                      <FileText size={14} style={{ color: 'var(--muted)' }} />
+                      <span>{doc.titulo}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
@@ -212,6 +251,30 @@ export function PesquisaAvancada() {
       />
 
       <style>{`
+        .search-suggestions {
+          position: absolute;
+          top: calc(100% + 4px);
+          left: 0;
+          right: 0;
+          z-index: 20;
+          max-height: 220px;
+          overflow-y: auto;
+          border: 1px solid #3f3f46;
+          border-radius: 8px;
+          background: #18181b;
+          box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+        }
+        .search-suggestion-item {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 10px 12px;
+          cursor: pointer;
+          font-size: 13px;
+          border-bottom: 1px solid #27272a;
+        }
+        .search-suggestion-item:last-child { border-bottom: none; }
+        .search-suggestion-item:hover { background: #27272a; }
         .search-results { display: flex; flex-direction: column; gap: 10px; }
         .search-result {
           display: grid;
